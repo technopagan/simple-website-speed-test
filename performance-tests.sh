@@ -86,8 +86,7 @@ Phantomas_JSON_output=$(phantomas --format=json --url "${URL_to_measure}")
 
 # Iterate over every created tile we have listed in our array
 for((i=0;i<${#Metrics_to_analyze[@]};i++)) ; do
-	JSON_metric_name=".metrics."${Metrics_to_analyze[$i]}
-	eval ${Metrics_to_analyze[$i]}=$(echo "$Phantomas_JSON_output" | jq "${JSON_metric_name}")
+	eval ${Metrics_to_analyze[$i]}=$(echo "$Phantomas_JSON_output" | jq ".metrics."${Metrics_to_analyze[$i]})
 	export ${Metrics_to_analyze[$i]}
 done
 
