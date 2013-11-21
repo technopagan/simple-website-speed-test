@@ -5,7 +5,7 @@
 # Bash script to initiate TAP compliant (http://www.testanything.org/) web 
 # performance metrics testing to be easily integrated with Jenkins or Travis CI
 #
-# Usage: bash performance-tests.sh http://your-url.tld/somepage
+# Usage: bash performance-tests.sh microsite.bats http://your-url.tld/somepage
 #
 ###############################################################################
 #
@@ -51,7 +51,7 @@
 # - performance-tests.bats:
 #		[...]
 # 	@test "Time to first byte" {
-#  		[ "$timeToFirstByte" -lt 200 ]
+#  		[ "$timeToFirstByte" -lt 180 ]
 # 	}
 #		[...]
 # 
@@ -63,8 +63,11 @@
 # USER CONFIGURABLE PARAMETERS
 ###############################################################################
 
-# Define an array of metrics to be analyzed 
-Metrics_to_analyze=('timeToFirstByte' 'medianResponse' 'requests' 'domains' 'redirects' 'cssCount' 'cssSize' 'jsCount' 'jsSize')
+# Define an array of metrics to be analyzed  // 
+Metrics_to_analyze=('timeToFirstByte' 'medianResponse' 'requests' 'domains' 'notFound' 'redirects' 'cssCount' 'cssSize' 'jsCount' 'jsSize' 'webfontCount' 'DOMelementMaxDepth')
+
+# How often should we run the test to arrive at a reliable median
+Iterations=5
 
 
 
@@ -72,11 +75,11 @@ Metrics_to_analyze=('timeToFirstByte' 'medianResponse' 'requests' 'domains' 'red
 # GLOBAL RUNTIME VARIABLES (usually do not require tuning by user)
 ###############################################################################
 
-# Accept the test URL as a command  line argument 
-URL_to_measure="$1"
+# Define against which test suite retrieved metrics will run
+Test_suite="$1"
 
-# Start PhantomJS based Phantomas (https://github.com/macbre/phantomas) to retrieve a JSON response containing all of Phantomas predefined performance metrics
-Phantomas_JSON_output=$(phantomas --format=json --url "${URL_to_measure}")
+# Accept the test URL as a command  line argument 
+URL_to_measure="$2"
 
 
 
@@ -84,11 +87,73 @@ Phantomas_JSON_output=$(phantomas --format=json --url "${URL_to_measure}")
 # MAIN PROGRAM
 ###############################################################################
 
-# Iterate over every created tile we have listed in our array
-for((i=0;i<${#Metrics_to_analyze[@]};i++)) ; do
-	eval ${Metrics_to_analyze[$i]}=$(echo "$Phantomas_JSON_output" | jq ".metrics."${Metrics_to_analyze[$i]})
-	export ${Metrics_to_analyze[$i]}
-done
+main() {
+	# Run the performance metrics collector multiple times so that we can later calculate stable results such as Median etc.
+	for((i=0;i<${Iterations};i++)) ; do
+		retrieve_phantomas_performance_metrics Phantomas_JSON_output "${URL_to_measure}"
+		Phantomas_JSON_output_array[${i}]=${Phantomas_JSON_output}
+		# echo ${Phantomas_JSON_output_array[i]}
+	done
+	# For each metric we want to measure, retrieve its value from each instance of our gathered performance metrics to create arrays of retrieved data per metric 
+	for((m=0;m<${#Metrics_to_analyze[@]};m++)) ; do
+		for((p=0;p<${#Phantomas_JSON_output_array[@]};p++)) ; do
+			# For each instance of the Phantomas JSON data, retrieve the desired metric
+			slice_metric Single_Metric "${Metrics_to_analyze[m]}" "${p}"
+			# Store all retrieved values of the desired metric in an new array
+			Sliced_metric_array[${p}]=${Single_Metric}
+		done
+		# For each array of values for a specific metric, calculate the Median (Mean)
+		calculate_mean Mean_metric Sliced_metric_array[@]
+		# Hand off the Mean result to a variable of identical name to the Phantomas metric and export it for access by BATS
+		eval ${Metrics_to_analyze[$m]}="${Mean_metric}"
+		export ${Metrics_to_analyze[$m]}
+	done
+	# After all iterations and calculations are done, start the matrics test suite
+	bats --tap "${Test_suite}"
+}
 
-# Initialize the BATS test suite with TAP (TestAnythingProtocol, http://testanything.org/) output
-bats --tap performance-tests.bats
+
+
+###############################################################################
+# FUNCTIONS
+###############################################################################
+
+# For a user-specified URL, retrieve performance metrics via Phantomas 
+function retrieve_phantomas_performance_metrics {
+	# Define local variables to work with
+	local  __result=$1
+  	local  __test_url=$2
+	# Use Phantomas to gather performance metrics in JSON format
+	local  __phantomas_json_output=$(phantomas --format=json --url "${__test_url}")
+	# Return the result
+	eval $__result="'${__phantomas_json_output}'"
+}
+
+# Using a CLI JSON parser, such as jq, extract single metrics from the main JSON response body
+function slice_metric {
+	# Define local variables to work with
+	local  __result=$1
+  	local  __metric=$2
+  	local  __test_instance=$3
+	# With jq, let's slice through our response JSON and retrieve the desired metric
+	local  __sliced_metric=$(echo "${Phantomas_JSON_output_array[__test_instance]}" | jq ".metrics."${__metric})
+	# Return the result
+	eval $__result="'${__sliced_metric}'"
+}
+
+# For arrays of values for a single metric, calculate the Mean (Median) value to prevent random outliers from making tests fail
+function calculate_mean {
+	# Define local variables to work with
+	local  __result=$1
+  	# BASH needs a rather complex syntax to accept an array as input
+  	declare -a __array_to_process=("${!2}")
+  	# Sort the array to ascending in numerical value
+	local  __array_to_process_sorted=($(printf '%s\n' "${__array_to_process[@]}" | sort -n))
+	# Find the Mean in the middle of the array index
+	local __metric_median=${__array_to_process_sorted[$(echo $((${#__array_to_process_sorted[@]}/2)))]}
+	# Return the result
+	eval $__result="'${__metric_median}'"
+}
+
+# Lastly, initiate the main function to start the entire process 
+main

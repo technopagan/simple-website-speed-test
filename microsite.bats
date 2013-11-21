@@ -1,11 +1,11 @@
 #!/usr/bin/env bats
 
 @test "Time to first byte" {
-  [ "$timeToFirstByte" -lt 200 ]
+  [ "$timeToFirstByte" -lt 180 ]
 }
 
 @test "Median Response Time" {
-  [ "$medianResponse" -lt 200 ]
+  [ "$medianResponse" -lt 220 ]
 }
 
 @test "Number of HTTP requests" {
@@ -13,7 +13,11 @@
 }
 
 @test "Number of domains" {
-  [ "$domains" -lt 5 ]
+  [ "$domains" -lt 7 ]
+}
+
+@test "Number of 404 Not Found" {
+  [ "$notFound" -eq 0 ]
 }
 
 @test "Number of redirects" {
@@ -25,13 +29,21 @@
 }
 
 @test "CSS size" {
-  [ "$cssSize" -lt 15360 ]
+  [ "$cssSize" -lt 65536 ]
 }
 
 @test "Number of Javascript files" {
-  [ "$jsCount" -lt 4 ]
+  [ "$jsCount" -lt 5 ]
 }
 
 @test "Javascript size" {
-  [ "$jsSize" -lt 153600 ]
+  [ "$jsSize" -lt 256000 ]
+}
+
+@test "Number of webfonts" {
+  [ "$webfontCount" -lt 3 ]
+}
+
+@test "DOM complexity" {
+  [ "$DOMelementMaxDepth" -lt 11 ]
 }
