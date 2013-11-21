@@ -5,7 +5,7 @@
 # Bash script to initiate TAP compliant (http://www.testanything.org/) web 
 # performance metrics testing to be easily integrated with Jenkins or Travis CI
 #
-# Usage: bash performance-tests.sh microsite.bats http://your-url.tld/somepage
+# Usage: ./webspeedtest microsite.bats http://your-url.tld/somepage
 #
 ###############################################################################
 #

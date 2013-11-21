@@ -3,7 +3,7 @@ simple-website-speed-test
 
 ## Quick Start
 
-* Usage: bash performance-tests.sh http://your-url.tld/somepage
+* Usage: ./webspeedtest microsite.bats  http://your-url.tld/somepage
 
 ## Introduction
 
